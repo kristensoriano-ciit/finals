@@ -1,0 +1,56 @@
+.expense-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 24px;
+}
+
+.expense-list p {
+  margin: 8px 0 0;
+}
+
+.expense-list .total {
+  display: block;
+  margin-top: 16px;
+  padding: 14px 16px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  background: #1e293b;
+  border-radius: 10px;
+}
+
+.expense-list ul {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.expense-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+/* long descriptions wrap instead of pushing the button off screen */
+.expense-list li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.expense-list li button {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  color: var(--danger);
+  background: #fff;
+  border-color: #f1c4bf;
+}
+
+.expense-list li button:hover {
+  background: #fdf0ee;
+}
