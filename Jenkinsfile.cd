@@ -1,0 +1,71 @@
+pipeline {
+    agent any
+
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        string(name: 'CI_BUILD_NUMBER', defaultValue: '', description: 'Successful main CI build to deploy')
+        choice(name: 'ENVIRONMENT', choices: ['DEV', 'TEST', 'ACC', 'PROD'], description: 'Target environment')
+    }
+
+    stages {
+        stage('Validate') {
+            steps {
+                script {
+                    if (!((params.CI_BUILD_NUMBER ?: '') ==~ /[1-9][0-9]*/)) {
+                        error('CI_BUILD_NUMBER must be a positive whole number')
+                    }
+                }
+                echo "Selected CI build: ${params.CI_BUILD_NUMBER}"
+                echo "Environment: ${params.ENVIRONMENT}"
+            }
+        }
+        stage('Retrieve Artifact') {
+            steps {
+                deleteDir()
+                copyArtifacts(
+                    projectName: 'expense-tracker-ci/main',
+                    selector: specific(params.CI_BUILD_NUMBER),
+                    filter: "react-app-${params.CI_BUILD_NUMBER}.tar.gz",
+                    fingerprintArtifacts: true
+                )
+            }
+        }
+        stage('Extract and Build Image') {
+            steps {
+                sh '''
+                    mkdir app
+                    tar -xzf "react-app-$CI_BUILD_NUMBER.tar.gz" -C app
+                    docker build -t "expense-tracker:ci-$CI_BUILD_NUMBER" app
+                '''
+            }
+        }
+        stage('Deploy') {
+            steps {
+                script {
+                    def ports = [DEV: '3001', TEST: '3002', ACC: '3003', PROD: '3004']
+                    def port = ports[params.ENVIRONMENT]
+                    def name = "expense-tracker-${params.ENVIRONMENT.toLowerCase()}"
+                    withEnv(["APP_PORT=${port}", "APP_NAME=${name}"]) {
+                        sh '''
+                            docker rm -f "$APP_NAME" 2>/dev/null || true
+                            docker run -d --name "$APP_NAME" -p "$APP_PORT:80" --restart unless-stopped "expense-tracker:ci-$CI_BUILD_NUMBER"
+
+                            # Wait until the web server in the new container answers
+                            for attempt in $(seq 1 10); do
+                                docker exec "$APP_NAME" wget -q -O /dev/null http://127.0.0.1/ && exit 0
+                                sleep 3
+                            done
+                            docker logs "$APP_NAME"
+                            exit 1
+                        '''
+                    }
+                    echo "CI build ${params.CI_BUILD_NUMBER} is on ${params.ENVIRONMENT}: http://localhost:${port}"
+                }
+            }
+        }
+    }
+}
